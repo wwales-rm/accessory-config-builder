@@ -1,0 +1,29 @@
+| Servos | Off Position | On Position | Baseboard | Level | Accessory Type | Accessory ID |
+|--------|--------------|-------------|-----------|-------|----------------|--------------|
+| 1      | 400          | 900         | 0         | Low   | Turnout        | 0            |
+| 33     | 400          | 899         | 1         | High  | Turnout        | 0            |
+| 34     | 400          | 900         | 1         | High  | Crossover      | 0            |
+| 35     | 401          | 900         | 1         | High  | Crossover      | 0            |
+| 36     | 100          | 1199        | 1         | High  | Uncoupler      | 0            |
+| 37     | 300          | 1200        | 1         | High  | Uncoupler      | 1            |
+| 38     | 400          | 906         | 1         | Low   | Turnout        | 1            |
+| 39     | 387          | 902         | 1         | Low   | Crossover      | 1            |
+| 40     | 405          | 896         | 1         | Low   | Crossover      | 1            |
+| 41     | 100          | 1202        | 1         | Low   | Uncoupler      | 2            |
+| 42     | 101          | 1178        | 1         | Low   | Uncoupler      | 3            |
+| 65     | 400          | 900         | 2         | High  | Crossover      | 0            |
+| 66     | 400          | 900         | 2         | High  | Crossover      | 0            |
+| 67     | 100          | 1201        | 2         | High  | Uncoupler      | 0            |
+| 68     | 94           | 1202        | 2         | High  | Uncoupler      | 1            |
+| 69     | 400          | 900         | 2         | Low   | Turnout        | 0            |
+| 70     | 400          | 900         | 2         | Low   | Turnout        | 1            |
+| 71     | 400          | 900         | 2         | Low   | Turnout        | 2            |
+| 72     | 402          | 894         | 2         | Low   | Turnout        | 3            |
+| 73     | 386          | 920         | 2         | Low   | Turnout        | 4            |
+| 74     | 103          | 1204        | 2         | Low   | Uncoupler      | 2            |
+| 75     | 100          | 1205        | 2         | Low   | Uncoupler      | 3            |
+| 76     | 108          | 1160        | 2         | Low   | Uncoupler      | 4            |
+| 97     | 386          | 920         | 3         | High  | Crossover      | 0            |
+| 98     | 387          | 918         | 3         | High  | Crossover      | 0            |
+| 99     | 94           | 1167        | 3         | High  | Uncoupler      | 0            |
+| 100    | 402          | 907         | 3         | Low   | Turnout        | 0            |
