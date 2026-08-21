@@ -1,28 +1,49 @@
-| Baseboard | Accessory Type | Accessory ID | Level | Rear Switch ID | Rear Switch Modes | Front Switch ID | Front Switch Modes |
-|-----------|----------------|--------------|-------|----------------|-------------------|-----------------|--------------------|
-| 0         | Features       | 0            | Low   | 0              | 1111              | 2               | 1010               |
-| 0         | Turnouts       | 0            | Low   | 1              | 1111              | 3               | 1010               |
-| 1         | Turnouts       | 0            | High  | 0              | 1111              | -               | -                  |
-| 1         | Crossovers     | 0            | High  | 1              | 1111              | -               | -                  |
-| 1         | Uncouplers     | 0            | High  | 2              | 1100              | -               | -                  |
-| 1         | Uncouplers     | 1            | High  | 3              | 1111              | -               | -                  |
-| 1         | Features       | 0            | Low   | 4              | 1111              | 10              | 1010               |
-| 1         | Features       | 1            | Low   | 5              | 1111              | 11              | 1010               |
-| 1         | Turnouts       | 1            | Low   | 6              | 1111              | 12              | 1010               |
-| 1         | Crossovers     | 1            | Low   | 7              | 1111              | 13              | 1000               |
-| 1         | Uncouplers     | 2            | Low   | 8              | 1111              | 14              | 1010               |
-| 1         | Uncouplers     | 3            | Low   | 9              | 1111              | 15              | 1010               |
-| 2         | Crossovers     | 0            | High  | 0              | 1111              | -               | -                  |
-| 2         | Uncouplers     | 0            | High  | 1              | 1111              | -               | -                  |
-| 2         | Uncouplers     | 1            | High  | 2              | 1111              | -               | -                  |
-| 2         | Turnouts       | 0            | Low   | 3              | 1111              | 11              | 1010               |
-| 2         | Turnouts       | 1            | Low   | 4              | 1111              | 12              | 1010               |
-| 2         | Turnouts       | 2            | Low   | 5              | 1111              | 13              | 1010               |
-| 2         | Turnouts       | 3            | Low   | 6              | 1111              | 14              | 1010               |
-| 2         | Turnouts       | 4            | Low   | 7              | 1111              | 15              | 1010               |
-| 2         | Uncouplers     | 2            | Low   | 8              | 1111              | 16              | 1010               |
-| 2         | Uncouplers     | 3            | Low   | 9              | 1111              | 17              | 1010               |
-| 2         | Uncouplers     | 4            | Low   | 10             | 1101              | 18              | 1001               |
-| 3         | Crossovers     | 0            | High  | 0              | 1111              | -               | -                  |
-| 3         | Uncouplers     | 0            | High  | 1              | 1111              | -               | -                  |
-| 3         | Turnouts       | 0            | Low   | 2              | 1111              | 3               | 1111               |
+| Module | Baseboard / Level | Accessory | Switch Position | Switch ID | Switch Modes |
+|--------|-------------------|-----------|-----------------|-----------|--------------|
+| 0      | A - Low           | F:0       | Rear            | ALR:0     | 0101         |
+| 0      | A - Low           | T:0       | Rear            | ALR:1     | 1111         |
+| 0      | A - Low           | F:0       | Front           | ALF:2     | 1010         |
+| 0      | A - Low           | T:0       | Front           | ALF:3     | 1010         |
+| 1      | B - Low           | F:0       | Rear            | BLR:0     | 1111         |
+| 1      | B - Low           | F:1       | Rear            | BLR:1     | 1111         |
+| 1      | B - Low           | U:0       | Rear            | BLR:2     | 0111         |
+| 1      | B - Low           | U:1       | Rear            | BLR:3     | 1111         |
+| 1      | B - Low           | T:0       | Rear            | BLR:4     | 1111         |
+| 1      | B - Low           | X:0       | Rear            | BLR:5     | 1111         |
+| 1      | B - Low           | F:0       | Front           | BLF:6     | 1010         |
+| 1      | B - Low           | F:1       | Front           | BLF:7     | 1010         |
+| 1      | B - Low           | U:0       | Front           | BLF:8     | 1010         |
+| 1      | B - Low           | U:1       | Front           | BLF:9     | 1010         |
+| 1      | B - Low           | T:0       | Front           | BLF:10    | 1010         |
+| 1      | B - Low           | X:0       | Front           | BLF:11    | 1010         |
+| 5      | B - High          | U:0       | Rear            | BHR:0     | 1111         |
+| 5      | B - High          | U:1       | Rear            | BHR:1     | 1111         |
+| 5      | B - High          | T:0       | Rear            | BHR:2     | 1111         |
+| 5      | B - High          | X:0       | Rear            | BHR:3     | 1111         |
+| 2      | C - Low           | F:0       | Rear            | CLR:0     | 1111         |
+| 2      | C - Low           | U:0       | Rear            | CLR:1     | 1110         |
+| 2      | C - Low           | U:1       | Rear            | CLR:2     | 1111         |
+| 2      | C - Low           | U:2       | Rear            | CLR:3     | 1111         |
+| 2      | C - Low           | T:0       | Rear            | CLR:4     | 1111         |
+| 2      | C - Low           | T:1       | Rear            | CLR:5     | 1111         |
+| 2      | C - Low           | T:2       | Rear            | CLR:6     | 1111         |
+| 2      | C - Low           | 3:0       | Rear            | CLR:7     | 1111         |
+| 2      | C - Low           | 3:0       | Rear            | CLR:8     | 1111         |
+| 2      | C - Low           | 3:0       | Rear            | CLR:9     | 1111         |
+| 2      | C - Low           | F:0       | Front           | CLF:10    | 1010         |
+| 2      | C - Low           | U:0       | Front           | CLF:11    | 1010         |
+| 2      | C - Low           | U:1       | Front           | CLF:12    | 1010         |
+| 2      | C - Low           | U:2       | Front           | CLF:13    | 1010         |
+| 2      | C - Low           | T:0       | Front           | CLF:14    | 1010         |
+| 2      | C - Low           | T:1       | Front           | CLF:15    | 1010         |
+| 2      | C - Low           | T:2       | Front           | CLF:16    | 1010         |
+| 2      | C - Low           | 3:0       | Front           | CLF:17    | 0010         |
+| 2      | C - Low           | 3:0       | Front           | CLF:18    | 1010         |
+| 2      | C - Low           | 3:0       | Front           | CLF:19    | 1010         |
+| 6      | C - High          | U:0       | Rear            | CHR:0     | 1111         |
+| 6      | C - High          | U:1       | Rear            | CHR:1     | 1111         |
+| 6      | C - High          | X:0       | Rear            | CHR:2     | 1111         |
+| 3      | D - Low           | T:0       | Rear            | DLR:0     | 1111         |
+| 3      | D - Low           | T:0       | Front           | DLF:1     | 1010         |
+| 7      | D - High          | U:0       | Rear            | DHR:0     | 1111         |
+| 7      | D - High          | X:0       | Rear            | DHR:1     | 1111         |

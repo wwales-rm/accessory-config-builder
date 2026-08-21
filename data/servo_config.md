@@ -1,29 +1,29 @@
-| Servos | Off Position | On Position | Baseboard | Level | Accessory Type | Accessory ID |
-|--------|--------------|-------------|-----------|-------|----------------|--------------|
-| 1      | 400          | 900         | 0         | Low   | Turnout        | 0            |
-| 33     | 400          | 899         | 1         | High  | Turnout        | 0            |
-| 34     | 400          | 900         | 1         | High  | Crossover      | 0            |
-| 35     | 401          | 900         | 1         | High  | Crossover      | 0            |
-| 36     | 100          | 1199        | 1         | High  | Uncoupler      | 0            |
-| 37     | 300          | 1200        | 1         | High  | Uncoupler      | 1            |
-| 38     | 400          | 906         | 1         | Low   | Turnout        | 1            |
-| 39     | 387          | 902         | 1         | Low   | Crossover      | 1            |
-| 40     | 405          | 896         | 1         | Low   | Crossover      | 1            |
-| 41     | 100          | 1202        | 1         | Low   | Uncoupler      | 2            |
-| 42     | 101          | 1178        | 1         | Low   | Uncoupler      | 3            |
-| 65     | 400          | 900         | 2         | High  | Crossover      | 0            |
-| 66     | 400          | 900         | 2         | High  | Crossover      | 0            |
-| 67     | 100          | 1201        | 2         | High  | Uncoupler      | 0            |
-| 68     | 94           | 1202        | 2         | High  | Uncoupler      | 1            |
-| 69     | 400          | 900         | 2         | Low   | Turnout        | 0            |
-| 70     | 400          | 900         | 2         | Low   | Turnout        | 1            |
-| 71     | 400          | 900         | 2         | Low   | Turnout        | 2            |
-| 72     | 402          | 894         | 2         | Low   | Turnout        | 3            |
-| 73     | 386          | 920         | 2         | Low   | Turnout        | 4            |
-| 74     | 103          | 1204        | 2         | Low   | Uncoupler      | 2            |
-| 75     | 100          | 1205        | 2         | Low   | Uncoupler      | 3            |
-| 76     | 108          | 1160        | 2         | Low   | Uncoupler      | 4            |
-| 97     | 386          | 920         | 3         | High  | Crossover      | 0            |
-| 98     | 387          | 918         | 3         | High  | Crossover      | 0            |
-| 99     | 94           | 1167        | 3         | High  | Uncoupler      | 0            |
-| 100    | 402          | 907         | 3         | Low   | Turnout        | 0            |
+| Servo | Off Position | On Position | Accessory |
+|-------|--------------|-------------|-----------|
+| AL:1  | 401          | 903         | T:0       |
+| BL:1  | 200          | 1196        | U:0       |
+| BL:2  | 100          | 1200        | U:1       |
+| BL:3  | 400          | 900         | T:0       |
+| BL:4  | 400          | 900         | X:0       |
+| BL:5  | 400          | 900         | X:0       |
+| BH:1  | 100          | 1200        | U:0       |
+| BH:2  | 100          | 1200        | U:1       |
+| BH:3  | 400          | 900         | T:0       |
+| BH:4  | 400          | 900         | X:0       |
+| BH:5  | 400          | 900         | X:0       |
+| CL:1  | 100          | 1200        | U:0       |
+| CL:2  | 100          | 1200        | U:1       |
+| CL:3  | 100          | 1200        | U:2       |
+| CL:4  | 400          | 900         | T:0       |
+| CL:5  | 400          | 900         | T:1       |
+| CL:6  | 400          | 900         | T:2       |
+| CL:7  | 400          | 900         | 3:0       |
+| CL:8  | 400          | 900         | 3:0       |
+| CH:1  | 100          | 1200        | U:0       |
+| CH:2  | 100          | 1200        | U:1       |
+| CH:3  | 400          | 900         | X:0       |
+| CH:4  | 400          | 900         | X:0       |
+| DL:1  | 400          | 900         | T:0       |
+| DH:1  | 99           | 1220        | U:0       |
+| DH:2  | 376          | 879         | X:0       |
+| DH:3  | 400          | 900         | X:0       |
