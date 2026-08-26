@@ -3,6 +3,7 @@ import os
 import sys
 import common
 import shared
+import json
 from shared import AccType
 from text_tables import parse_markdown_table, to_markdown_table
 
@@ -53,7 +54,7 @@ def export_switches_config_to_binary_matrix(switch_data: dict[str,list]) -> None
                 bin_file.write(packed_mask)
                 file_size += len(packed_mask)
                 
-    print(f"💾 Binary switch config data written to '{common.SWITCH_CONFIG_FILE}' ({file_size} bytes).")
+    print(f"💾 Saved switch configuration data to '{common.SWITCH_CONFIG_FILE}' ({file_size} bytes).")
 
 def create_switches_config():
 
@@ -134,10 +135,10 @@ def export_servos_config_to_binary(servo_data: dict) -> None:
             bin_file.write(record_bytes)
             file_size += len(record_bytes)
             
-    print(f"💾 Binary servo config data written to '{common.SERVO_CONFIG_FILE}' ({num_servos} items, {file_size} bytes)")
+    print(f"💾 Saved servo configuration data to '{common.SERVO_CONFIG_FILE}' ({num_servos} items, {file_size} bytes)")
 
-    # Read Markdown that describes the switch modes
 def create_servos_config():
+
     with open(os.path.join(common.ROOT_DIR, common.SERVO_CONFIG_INPUT_FILE), "r", encoding="utf-8") as fd:
         servos_mode_markdown = fd.read()
 
@@ -150,85 +151,128 @@ def create_servos_config():
     # Generate required binary file
     export_servos_config_to_binary(servos_mode_data)
 
-def export_accessories_config_to_binary(accessories_data: dict) -> None:
-    """
-    Packs accessories start up states and into a 2-byte binary structure.
-    Header: 1-byte count of total number of accessories on layout.
-    Records: 
-      - Bytes 0 & 1: Unsigned 16 bit integer containing global accessory ID
-      - Byte 2: Bitmask for modes 0 to 3: mode N is encoded in bits 2N+1 & 2N
-    """
+def read_accessory_info_from_json() -> list[dict]:
+    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_TEMP_FILE), 'r') as json_file:
+        acc_info = json.load(json_file)
+    return acc_info
 
+def read_accessory_mode_info_from_markdown() -> list[dict]:
+    # Read Markdown that describes the feature modes
+    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_CONFIG_INPUT_FILE), "r", encoding="utf-8") as fd:
+        accessories_mode_markdown = fd.read()
+    # Parse Markdown
+    accessories_mode_data = parse_markdown_table(
+        accessories_mode_markdown,
+        column_types={"Startup Modes": str}
+    )
+    return accessories_mode_data
+
+def transform_accessory_mode_data(mode_data: list[dict]) -> dict[int, int]:
     # The following columns of the data table are required:
     # * 'Baseboard / Level' - value parsed to get the module containing the accessory
     # * 'Accessory' - value parsed to get the accessory type and local ID
     # * 'Startup Modes' - value parsed to get the startup mode data - valid values depend on accessory type
-    module_strs = accessories_data["Baseboard / Level"]
-    acc_strs = accessories_data["Accessory"]
-    modes_strs = accessories_data["Startup Modes"]
+    module_strs = mode_data["Baseboard / Level"]
+    acc_strs = mode_data["Accessory"]
+    modes_strs = mode_data["Startup Modes"]
 
     num_accessories = len(module_strs)
 
     acc_short_name_map = {v: k for k, v in shared.ACCESSORY_SHORTNAMES.items()}
     mode_str_map = {'0': 0b00, '1': 0b01, '2': 0b10, '3': 0b11}
 
-    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_CONFIG_FILE), "wb") as bin_file:
-        # Write file header: Total number of active records (1 byte)
-        header = struct.pack("<B", num_accessories)
-        bin_file.write(header)
-        file_size = len(header)
-        
-        # Write individual records sequentially
-        for idx in range(num_accessories):
+    result = {}
 
-            # Parse module info: form 'X - YYY', where X is baseboard id ('A'..'D') and YYY is level (Low -> 0 or High -> 1)
-            module_str = module_strs[idx]
-            bb_id_str, level_id_str = module_str.split(' - ', 1)
-            bb = shared.BASEBOARD_VALUE_MAP[bb_id_str.upper()]
-            level = shared.LEVEL_VALUE_MAP[level_id_str.lower()]
+    # Write individual records sequentially
+    for idx in range(num_accessories):
 
-            # Parse accessory info: form X:N, where X is code for feature and N is local accessory ID number
-            acc_str = acc_strs[idx]
-            acc_type_str, acc_id_str = acc_str.split(':', 1)
-            acc_type = acc_short_name_map[acc_type_str]
-            acc_id = int(acc_id_str)
+        # Parse module info: form 'X - YYY', where X is baseboard id ('A'..'D') and YYY is level (Low -> 0 or High -> 1)
+        module_str = module_strs[idx]
+        bb_id_str, level_id_str = module_str.split(' - ', 1)
+        bb = shared.BASEBOARD_VALUE_MAP[bb_id_str.upper()]
+        level = shared.LEVEL_VALUE_MAP[level_id_str.lower()]
 
-            # Parse mode data
-            modes_str = modes_strs[idx]
-            # -- Ensure characters in mode string are valid for type of current accessory
-            mode_chars = [str(i) for i in range(0, shared.ACCESSORY_MODE_COUNTS[acc_type])]
-            for char in modes_str:
-                if char not in mode_chars:
-                    raise ValueError(f"Mode digit {char} out of range for accessory type {shared.ACCESSORY_SHORTNAMES[acc_type]}")
-            # -- Assemble binary modes byte
-            modes_mask = 0
-            for mode_idx, char in enumerate(modes_str):
-                if char not in mode_str_map.keys():
-                    raise ValueError(f"Invalid mode character {char}")
-                modes_mask |= (mode_str_map[char] << 2 * mode_idx)
+        # Parse accessory info: form X:N, where X is code for feature and N is local accessory ID number
+        acc_str = acc_strs[idx]
+        acc_type_str, acc_id_str = acc_str.split(':', 1)
+        acc_type = acc_short_name_map[acc_type_str]
+        acc_id = int(acc_id_str)
 
-            # -- Assemble global accessory ID
-            module = shared.encode_module_id(level, bb)
-            global_id = shared.encode_global_acc_id(module, acc_type, acc_id)
+        # -- Assemble global accessory ID
+        module = shared.encode_module_id(level, bb)
+        global_id = shared.encode_global_acc_id(module, acc_type, acc_id)
 
-            # Write data record: Format: H (2-byte Global accessory ID), B (1-byte mode mask) = 2 bytes
-            record_bytes = struct.pack("<HB", global_id, modes_mask)
-            bin_file.write(record_bytes)
-            file_size += len(record_bytes)
+        # -- Parse mode data
+        modes_str = modes_strs[idx]
+        # -- Ensure characters in mode string are valid for type of current accessory
+        mode_chars = [str(i) for i in range(0, shared.ACCESSORY_MODE_COUNTS[acc_type])]
+        for char in modes_str:
+            if char not in mode_chars:
+                raise ValueError(f"Mode digit {char} out of range for accessory type {shared.ACCESSORY_SHORTNAMES[acc_type]}")
+        # -- Assemble binary modes byte
+        modes_mask = 0
+        for mode_idx, char in enumerate(modes_str):
+            if char not in mode_str_map.keys():
+                raise ValueError(f"Invalid mode character {char}")
+            modes_mask |= (mode_str_map[char] << 2 * mode_idx)
 
-    print(f"💾 Binary accessory config data written to '{common.ACCESSORY_CONFIG_FILE}' ({num_accessories} items, {file_size} bytes)")
+        result[global_id] = modes_mask
 
-def create_accessories_config():
-    # Read Markdown that describes the feature modes
-    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_CONFIG_INPUT_FILE), "r", encoding="utf-8") as fd:
-        features_mode_markdown = fd.read()
-    # Parse Markdown
-    accessories_mode_data = parse_markdown_table(
-        features_mode_markdown,
-        column_types={"Startup Modes": str}
-    )
-    # Generate required binary file
-    export_accessories_config_to_binary(accessories_mode_data)
+    return result
+
+def export_accessory_info_to_binary(accessory_info: list, accessories_mode_data: list) -> None:
+    """
+    Packs layout accessory data into variable-length binary structures
+    and writes them to a local binary configuration file.
+    """
+
+    def add_list_to_data(data: list[int], l: list[int]) -> list[int]:
+        return data + [len(l)] + l
+
+    transformed_mode_data = transform_accessory_mode_data(accessories_mode_data)
+
+    count = len(accessory_info)
+
+    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_FILE), "wb") as bin_file:
+
+        count_byte = struct.pack("<B", count)
+        bin_file.write(count_byte)
+        file_size = len(count_byte)
+
+        for acc in accessory_info:
+
+            # --- Fixed data: global ID & mode mask ---
+            global_id = acc['global_id']
+            mode_mask = transformed_mode_data[global_id]
+            bin_file.write(struct.pack("<HB", global_id, mode_mask))
+            file_size += 3
+
+            data = []
+
+            # --- Rear switch IDs
+            rear_switches = acc['rear_switches'] if acc['rear_switches'] is not None else []
+            data = add_list_to_data(data, rear_switches)
+
+            # --- Front switch IDs
+            front_switches = acc['front_switches'] if acc['front_switches'] is not None else []
+            data = add_list_to_data(data, front_switches)
+
+            # --- LED IDs
+            leds = acc['leds'] if acc['leds'] is not None else []
+            data = add_list_to_data(data, leds)
+
+            # --- Servos
+            servos = acc['servos'] if acc['servos'] is not None else []
+            data = add_list_to_data(data, servos)
+
+            # --- write the total length of data, followed by data for this accessory
+            assert len(data) < 256, "Accessory data length exceeds byte limit"
+            bin_file.write(struct.pack("<B", len(data)))
+            for d in data:
+                bin_file.write(struct.pack("<B", d))
+            file_size += 1 + len(data)
+                
+    print(f"💾 Saved accessory data to '{common.ACCESSORY_INFO_FILE}' ({count} items, {file_size} bytes)")
 
 MODE_HEADINGS = [
     'Club Mode (normal)', 
@@ -269,13 +313,13 @@ def reconstruct_accessories_from_binary() -> list:
 
         # Read exactly the specified number of records
         for record_idx in range(total_records):
-            # read fixed header: global accessory ID and total accessory data size
-            header_bytes = bin_file.read(3)
+            # read fixed header: global accessory ID, mode bitmask and total accessory data size
+            header_bytes = bin_file.read(4)
 
-            if len(header_bytes) < 3:
+            if len(header_bytes) < 4:
                 raise FileFormatError(f"Malformed binary: Expected {total_records} records, but file ended abruptly at record {record_idx}.")
 
-            global_id, acc_data_size = struct.unpack("<HB", header_bytes)
+            global_id, mode_mask, acc_data_size = struct.unpack("<HBB", header_bytes)
             module, acc_type, local_id = shared.decode_global_acc_id(global_id)
             level, bb = shared.decode_module_id(module)
 
@@ -310,7 +354,8 @@ def reconstruct_accessories_from_binary() -> list:
                 'rear_switches': rear_switches,
                 'front_switches': front_switches,
                 'leds': leds,
-                'servos': servos
+                'servos': servos,
+                'mode_mask': mode_mask
             })
 
     return configs
@@ -324,7 +369,7 @@ def reconstruct_switch_config_from_binary() -> dict:
         for module in range(shared.NUM_MODULES):
             for op_mode in range(shared.NUM_OPERATING_MODES):
                 packed_mask = bin_file.read(4)
-                if len(packed_mask) < 4:
+                if len(packed_mask) < 4:    
                     raise FileFormatError(f"Malformed binary: {common.SWITCH_CONFIG_FILE} must be exactly 64 bytes.")
                 mask = struct.unpack("<I", packed_mask)[0]
                 matrix_dict[module][op_mode] = mask
@@ -365,44 +410,6 @@ def reconstruct_servo_config_from_binary() -> dict:
 
     return column_data
 
-def reconstruct_accessory_config_from_binary() -> dict:
-    """Reads binary accessories config file and populates the designers' columnar dictionary layout."""
-    
-    column_data = {
-        "global_id": [], 
-        "module_id": [],
-        "acc_type": [],
-        "acc_local_id": [],
-        "startup_modes": []
-    }
-    RECORD_SIZE = 3
-
-    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_CONFIG_FILE), "rb") as bin_file:
-
-        header = bin_file.read(1)
-        if not header:
-            return column_data
-        num_features = struct.unpack("<B", header)[0]
-
-        for _ in range(num_features):
-            record_bytes = bin_file.read(RECORD_SIZE)
-            if len(record_bytes) < RECORD_SIZE:
-                raise FileFormatError(f"Malformed binary: Incomplete {RECORD_SIZE}-byte record found in {common.FEATURE_CONFIG_FILE}.")
-
-            global_id, startup_modes = struct.unpack("<HB", record_bytes)
-
-            # Extract baseboard and local feature ID information from global_id byte
-            module_id, acc_type, acc_local_id = shared.decode_global_acc_id(global_id)
-
-
-            column_data["global_id"].append(global_id)
-            column_data["module_id"].append(module_id)
-            column_data["acc_type"].append(acc_type)
-            column_data["acc_local_id"].append(acc_local_id)
-            column_data["startup_modes"].append(startup_modes)
-
-    return column_data
-
 def validate_binary_files() -> tuple:
     """
     Validates cross-file relationships and checks binary limits.
@@ -410,12 +417,11 @@ def validate_binary_files() -> tuple:
     """
     errors = []
 
-    # 1. Parse and extract reconstructed parameters from all 3 files
+    # Parse and extract reconstructed parameters from all 3 files
     try:
         layout_configs = reconstruct_accessories_from_binary()
         switch_matrix = reconstruct_switch_config_from_binary()
         servo_data = reconstruct_servo_config_from_binary()
-        accessory_data = reconstruct_accessory_config_from_binary()
     except (FileNotFoundError) as err:
         return False, [f"Validation aborted due to file not found error: {err}"]
     except (FileFormatError) as err:
@@ -439,6 +445,7 @@ def validate_binary_files() -> tuple:
         front_switches = acc['front_switches']
         leds = acc['leds']
         servos = acc['servos']
+        mode_mask = acc['mode_mask']
 
         layout_switches_per_module[module].update(rear_switches)
         layout_switches_per_module[module].update(front_switches)
@@ -446,7 +453,14 @@ def validate_binary_files() -> tuple:
             layout_servos_per_module[module].add(s_id)
         layout_accessories_set.add(global_id)
 
-    # Cross-Check A: Cross-reference switches matrix definitions with accessories configuration
+        # Validate that start-up states for each mode are valid for accessory
+        for mode_idx in range(shared.NUM_OPERATING_MODES):
+            state = (mode_mask >> 2 * mode_idx) & 0b11
+            valid_states = list(range(shared.ACCESSORY_MODE_COUNTS[acc_type]))
+            if state not in valid_states:
+                errors.append(f"Accessory {global_id} has invalid state {state} for operating mode {mode_idx}")
+
+    # Cross-reference switches matrix definitions with accessories configuration
 
     for module in range(shared.NUM_MODULES):
         for op_mode in range(shared.NUM_OPERATING_MODES):
@@ -458,7 +472,7 @@ def validate_binary_files() -> tuple:
                 if (matrix_mask & (1 << pin_id)) and (pin_id not in layout_switches_per_module[module]):
                     errors.append(f"Constraint Violation: {common.SWITCH_CONFIG_FILE} (Module {module}, Mode {op_mode}) enables Switch ID {pin_id}, but this switch does not exist in {common.ACCESSORY_INFO_FILE}.")
 
-    # Cross-Check B: Check if every servo listed in accessory info file exists in servos config file
+    # Check if every servo listed in accessory info file exists in servos config file
 
     servo_config_servos_per_module = {module: set() for module in range(shared.NUM_MODULES)}
     servo_data_len = len(servo_data['module_id'])
@@ -471,28 +485,11 @@ def validate_binary_files() -> tuple:
         if missing_servos:
             errors.append(f"Constraint Violation: Servos {missing_servos} defined for module {module}  in {common.ACCESSORY_INFO_FILE} are missing inside {common.SERVO_CONFIG_FILE}.")
 
-    # Cross-Check C: Check if every local servo has an id in [1..15]
+    # Check if every local servo has an id in [1..15]
+    
     for local_servo_id in servo_data['local_servo_id']:
         if not shared.MIN_SERVO_ID <= local_servo_id <= shared.MAX_SERVO_ID:
             errors.append(f"Constraint Violation: Servo ID {s_id} is out of permittted range ({shared.MIN_SERVO_ID}..{shared.MAX_SERVO_ID}).")
-
-    # Cross-Check D: Check every accessory on the layout exists in the accessory config binary file
-    try:
-        global_accessory_ids_set = {
-            shared.encode_global_acc_id(module_id, acc_type, acc_id)
-            for module_id, acc_type, acc_id in zip(
-                accessory_data["module_id"],
-                accessory_data["acc_type"],
-                accessory_data["acc_local_id"],
-                strict=True
-            )
-        }
-    except ValueError:
-        errors.append("Malformed accessory config data: value lists are not the same length")
-    else:
-        missing_accs = layout_accessories_set - global_accessory_ids_set
-        if missing_accs:
-            errors.append(f"Constraint violation: Accessories {missing_accs} defined in {common.ACCESSORY_INFO_FILE}, have not been configured in {common.ACCESSORY_CONFIG_FILE}")
 
     is_valid = len(errors) == 0
     return is_valid, errors
@@ -526,6 +523,105 @@ def make_table_cols(*headings: str | list[str]) -> dict[str, list]:
         elif isinstance(item, str):
             result.update({item: []})
     return result
+
+def generate_accessory_table(accessory_info: list) -> dict:
+    """
+    Combines accessory configurations into a human-readable columnar dictionary 
+    describing all accessories, their physical switches, LEDs, and servos.
+    Sorted by Baseboard, Accessory Type (Standard order), and Local Accessory ID.
+    """
+
+    # 1. Unpack, format, and organize rows for explicit multi-key sorting
+    raw_rows = []
+    for acc in accessory_info:
+        global_id = acc['global_id']
+        module, acc_type, local_id = shared.decode_global_acc_id(global_id)
+        level, bb = shared.decode_module_id(module)
+        rear_sw = "`" + "`,`".join(map(str, acc['rear_switches'])) + "`" if acc['rear_switches'] else "-"
+        front_sw = "`" + "`,`".join(map(str, acc['front_switches'])) + "`" if acc['front_switches'] else "-"
+        led_str = "`" + "`,`".join(map(str, acc['leds'])) + "`" if acc['leds'] else "-"
+        servo_str = "`" + "`,`".join(map(str, acc['servos'])) + "`" if acc['servos'] else "-"
+        global_id_str = f"`{global_id}`"
+        global_code_str = f"`{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0]}{shared.ACCESSORY_SHORTNAMES[acc_type]}:{local_id}`"
+        local_id_str = f"`{local_id}`"
+        module_str = f"`{module}` ({shared.LEVEL_NAMES_MAP[level]} level, baseboard {shared.BASEBOARD_NAMES_MAP[bb]})"
+        mode_mask = acc["mode_mask"]
+        mode_state = [None] * shared.NUM_OPERATING_MODES
+        for mode_num in range(shared.NUM_OPERATING_MODES):
+            mode = (mode_mask >> 2 * mode_num) & 0b11
+            mode_state[mode_num] = f"`{mode}`"
+            # column_data[MODE_HEADINGS[mode_num]].append(mode_str)
+        mode_str = ",".join(mode_state)
+
+        raw_rows.append({
+            '_global_id': global_id,
+            'Global ID': global_id_str,
+            'Global Code': global_code_str,
+            'Module': module_str,
+            'Accessory Type': shared.ACCESSORY_NAMES[acc_type],
+            'Accessory ID': local_id_str,
+            'Rear Switches': rear_sw,
+            'Front Switches': front_sw,
+            'LEDs': led_str,
+            'Servos': servo_str,
+            'Startup State': mode_str
+        })
+        
+    # 2. Sort by global ID string, stripped of leading and trailing back ticks
+    raw_rows.sort(key=lambda x: (int(x['_global_id'])))
+    
+    # 3. Reassemble structured row arrays back into parallel column arrays
+    column_data = {
+        'Global ID': [],
+        'Global Code': [],
+        'Module': [],
+        'Accessory Type': [],
+        'Accessory ID': [],
+        'Rear Switches': [],
+        'Front Switches': [],
+        'LEDs': [],
+        'Servos': [],
+        'Startup State': []
+    }
+    
+    for row in raw_rows:
+        for key in column_data.keys():
+            column_data[key].append(row[key])
+            
+    return column_data
+
+def save_accessory_docs(accessory_info: list) -> None:
+
+    doc_info = generate_accessory_table(accessory_info)
+
+    bb_names = list(shared.BASEBOARD_NAMES_MAP.values())
+
+    markdown = "# Accessory Details\n\n"
+    markdown += "The following table describes all the layout's accessories.\n\n"
+    markdown += "* _Global ID_ identifies the accessory uniquely within the whole layout.\n"
+    markdown += "* _Global Code_ human readable version of _Global ID_. It can be decoded as follows:\n"
+    markdown += f"    * 1st character: baseboard ID (`{bb_names[0]}`..`{bb_names[-1]}`)\n"
+    markdown += f"    * 2nd character: level ({'; '.join([f"`{i[0].upper()}` - {i.capitalize()}" for i in shared.LEVEL_VALUE_MAP.keys() ])})\n"
+    markdown += f"    * 3rd character: accessory type ({'; '.join([f"`{shared.ACCESSORY_SHORTNAMES[a].upper()}` - {shared.ACCESSORY_NAMES[a].capitalize()}" for a in AccType])})\n"
+    markdown += "    * Separator (`:`)\n"
+    markdown += f"    * digit(s): the id (`0`..`{shared.MAX_ACCESSORIES_PER_MODULE - 1}`) of the accessory within its baseboard, level and type\n"
+    markdown += "* _Module_ identifies the module that contains the accessory.\n"
+    markdown += "* _Accessory Type_ specifies the type of the accessory.\n"
+    markdown += "* _Accessory ID_ is the local identifier of the accessory, unique only within its baseboard and type.\n"
+    markdown += "* _Rear Switches_ is a list of the IDs of the switches that operates the accessory from the rear of the baseboard.\n"
+    markdown += "* _Front Switches_ is a list of the IDs of the switches that operates the accessory from the front of the baseboard, if any.\n"
+    markdown += "* _LEDs_ is a list of LEDs that are controlled by the accessory, if any.\n"
+    markdown += "* _Servos_ is a list of Servos that are controlled by the accessory, if any.\n"
+    op_modes = '; '.join(f"{i} - {MODE_HEADINGS[i]}" for i in range(shared.NUM_OPERATING_MODES))
+    markdown += f"* _Startup State_ is a list of comma separated the start-up states of the accessory in each of the four operating modes, from 0 to {shared.NUM_OPERATING_MODES - 1}. Operating modes are:\n"
+    markdown += '\n'.join(f"    * {i} - {MODE_HEADINGS[i]}" for i in range(shared.NUM_OPERATING_MODES))
+    markdown += "\n\n"
+    markdown += to_markdown_table(doc_info, max_widths=uniform_table_padding(doc_info, 99))
+    markdown += "\n\nNote that switch, LED and servo IDs are unique within their host module, but not unique across the layout.\n"
+
+    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_DOCS_FILE), "w", encoding="utf-8") as fd:
+        fd.write(markdown)
+    print(f"💾 Saved accessory documentation to '{common.ACCESSORY_DOCS_FILE}'")
 
 def save_switch_config_docs(switch_data: list, accessories_data: list) -> None:
 
@@ -561,7 +657,6 @@ def save_switch_config_docs(switch_data: list, accessories_data: list) -> None:
 
     for module, sw in switch_to_acc:
         (acc_gid, pos) = switch_to_acc[(module, sw)]
-        # acc_gid = acc["global_id"]
         _, acc_type, acc_id = shared.decode_global_acc_id(acc_gid)
         level, bb = shared.decode_module_id(module)
         acc_code = f"`{shared.ACCESSORY_SHORTNAMES[acc_type]}:{acc_id}`"
@@ -669,49 +764,6 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     save_markdown(markdown, common.SERVO_DOCS_FILE)
     print(f"💾 Saved servo configuration documentation to '{common.SERVO_DOCS_FILE}'")
 
-def save_accessory_config_docs(accessory_data: dict[str, list]) -> None:
-
-    column_headings = ["Accessory"]
-    column_data = make_table_cols(column_headings, MODE_HEADINGS)
-
-    for idx in range(len(accessory_data['global_id'])):
-
-        global_id = accessory_data['global_id'][idx]
-        module, acc_type, local_id = shared.decode_global_acc_id(global_id)
-        level, bb = shared.decode_module_id(module)
-
-        column_data['Accessory'].append(
-            f"`{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0].upper()}{shared.ACCESSORY_SHORTNAMES[acc_type]}:{local_id}`"
-        )
-
-        mode_mask = accessory_data["startup_modes"][idx]
-        for mode_num in range(shared.NUM_OPERATING_MODES):
-            mode = (mode_mask >> 2 * mode_num) & 0b11
-            mode_str = f"`{mode}`"
-            column_data[MODE_HEADINGS[mode_num]].append(mode_str)
-
-    markdown = "# Accessory Start-up States\n\n"
-    markdown += "The following table displays information about each accessory's start-up state for each operating mode.\n\n"
-    markdown += "* _Accessory_ identifies the accessory uniquely across the whole layout.\n"
-    markdown += "* The last four columns shows the state of the accessory at start-up for each of the operating modes.\n\n"
-    markdown += generate_markdown_table(column_data)
-    bb_names = list(shared.BASEBOARD_NAMES_MAP.values())
-    markdown += "\n\nKey:\n\n"
-    markdown += "* Accessory IDs have the format `WXY:Z`, where:\n\n"
-    markdown += f"    * 1st character: baseboard ID (`{bb_names[0]}`..`{bb_names[-1]}`)\n"
-    markdown += f"    * 2nd character: level ({'; '.join([f"`{i[0].upper()}` - {i.capitalize()}" for i in shared.LEVEL_VALUE_MAP.keys() ])})\n"
-    markdown += f"    * 3rd character: accessory type ({'; '.join([f"`{shared.ACCESSORY_SHORTNAMES[a].upper()}` - {shared.ACCESSORY_NAMES[a].capitalize()}" for a in AccType])})\n"
-    markdown += "    * 4th character: separator (always `:`)\n"
-    markdown += f"    * digit(s): the id (`0`..`{shared.MAX_ACCESSORIES_PER_MODULE - 1}`) of the accessory within its baseboard, level and type\n\n"
-    markdown += "* Each type of accessory has a different number of valid start-up states, as follows:\n\n"
-    markdown += "".join([f"    * {shared.ACCESSORY_NAMES[acc]} - `0`..`{shared.ACCESSORY_MODE_COUNTS[acc] - 1}`\n" for acc in AccType])
-    markdown += "\n"
-    markdown += "    See the layout description document for information about the different states.\n"
-
-    save_markdown(markdown, common.ACCESSORY_CONFIG_DOCS_FILE)
-
-    print(f"💾 Saved accessory configuration documentation to '{common.ACCESSORY_CONFIG_DOCS_FILE}'")
-
 def generate_summary_docs_table(accessory_data: dict[str, list]) -> str:
 
     def summarize_module_elements(data: list, target_keys: list) -> tuple[dict, list[dict]]:
@@ -782,17 +834,18 @@ def save_summary_docs(accessory_data: dict[str, list]) -> None:
 
 if __name__ == "__main__":
 
-    if not os.path.exists(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_FILE)):
+    if not os.path.exists(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_TEMP_FILE)):
         print(f"❌ Run '{common.BUILD_ACCESSORY_SCRIPT}' first")
         sys.exit(1)
 
     # --- BUILD CONFIGS ---
 
-    create_accessories_config()
+    acc_info = read_accessory_info_from_json()
+    acc_mode_info = read_accessory_mode_info_from_markdown()
+
+    export_accessory_info_to_binary(acc_info, acc_mode_info)
     create_switches_config()
     create_servos_config()
-
-    # # --- VALIDATE ---
 
     # Validate binary files
     is_valid, validation_errors = validate_binary_files()
@@ -804,12 +857,11 @@ if __name__ == "__main__":
         recovered_accessories = reconstruct_accessories_from_binary()
         recovered_switch_config = reconstruct_switch_config_from_binary()
         recovered_servo_config = reconstruct_servo_config_from_binary()
-        recovered_accessory_config = reconstruct_accessory_config_from_binary()
 
         # Generate hardware documentation
+        save_accessory_docs(recovered_accessories)
         save_switch_config_docs(recovered_switch_config, recovered_accessories)
         save_servo_config_docs(recovered_servo_config, recovered_accessories)
-        save_accessory_config_docs(recovered_accessory_config)
         save_summary_docs(recovered_accessories)
 
         # Display hardware summary
@@ -819,7 +871,6 @@ if __name__ == "__main__":
         print(f"\n✅ NEXT STEPS:")
         print(f"   Copy all files from the '{common.BIN_DIR}' directory to every layout microcontroller:")
         print(f"      * '{os.path.basename(common.ACCESSORY_INFO_FILE)}'")
-        print(f"      * '{os.path.basename(common.ACCESSORY_CONFIG_FILE)}'")
         print(f"      * '{os.path.basename(common.SWITCH_CONFIG_FILE)}'")
         print(f"      * '{os.path.basename(common.SERVO_CONFIG_FILE)}'")
 

@@ -3,6 +3,7 @@ import os
 import sys
 from enum import Enum
 import struct
+import json
 
 import common
 import shared
@@ -300,55 +301,12 @@ def validate_accessory_info(acc_info: list[dict[str,int | list[int]]]) -> None:
     is_valid = len(errors) == 0
     return is_valid, errors
 
-def save_accessory_info_to_binary(accessory_info: list) -> None:
-    """
-    Packs layout accessory data into variable-length binary structures
-    and writes them to a local binary configuration file.
-    """
+def save_accessory_info_json(accessory_info: list) -> None:
 
-    def add_list_to_data(data: list[int], l: list[int]) -> list[int]:
-        return data + [len(l)] + l
+    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_TEMP_FILE), 'w', encoding='utf-8') as json_file:
+        json.dump(accessory_info, json_file)
 
-    count = len(accessory_info)
-
-    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_FILE), "wb") as bin_file:
-
-        count_byte = struct.pack("<B", count)
-        bin_file.write(count_byte)
-        file_size = len(count_byte)
-        for acc in accessory_info:
-
-            # --- Accessory global ID ---
-            global_id = acc['global_id']
-            bin_file.write(struct.pack("<H", global_id))
-            file_size += 2
-
-            data = []
-
-            # --- Rear switch IDs
-            rear_switches = acc['rear_switches'] if acc['rear_switches'] is not None else []
-            data = add_list_to_data(data, rear_switches)
-
-            # --- Front switch IDs
-            front_switches = acc['front_switches'] if acc['front_switches'] is not None else []
-            data = add_list_to_data(data, front_switches)
-
-            # --- LED IDs
-            leds = acc['leds'] if acc['leds'] is not None else []
-            data = add_list_to_data(data, leds)
-
-            # --- Servos
-            servos = acc['servos'] if acc['servos'] is not None else []
-            data = add_list_to_data(data, servos)
-
-            # --- write the total length of data, followed by data for this accessory
-            assert len(data) < 256, "Accessory data length exceeds byte limit"
-            bin_file.write(struct.pack("<B", len(data)))
-            for d in data:
-                bin_file.write(struct.pack("<B", d))
-            file_size += 1 + len(data)
-                
-    print(f"💾 Binary accessory data saved in '{common.ACCESSORY_INFO_FILE}' ({count} items, {file_size} bytes)")
+    print(f"💾 Temporary accessory data saved in '{common.ACCESSORY_INFO_TEMP_FILE}'")
 
 def uniform_table_padding(columns: dict, padding: int = 99) -> dict[str,int]:
     widths = {}   
@@ -362,92 +320,6 @@ def save_markdown_table(table_cols: dict[str,int], filename: str) -> None:
     markdown = to_markdown_table(table_cols, max_widths=table_widths) + "\n"
     with open(os.path.join(common.ROOT_DIR, filename), "w", encoding="utf-8") as fd:
         fd.write(markdown)
-
-def generate_accessory_table(accessory_info: list) -> dict:
-    """
-    Combines accessory configurations into a human-readable columnar dictionary 
-    describing all accessories, their physical switches, LEDs, and servos.
-    Sorted by Baseboard, Accessory Type (Standard order), and Local Accessory ID.
-    """
-
-    # 1. Unpack, format, and organize rows for explicit multi-key sorting
-    raw_rows = []
-    for acc in accessory_info:
-        global_id = acc['global_id']
-        module, acc_type, local_id = shared.decode_global_acc_id(global_id)
-        level, bb = shared.decode_module_id(module)
-        rear_sw = "`" + "`,`".join(map(str, acc['rear_switches'])) + "`" if acc['rear_switches'] else "-"
-        front_sw = "`" + "`,`".join(map(str, acc['front_switches'])) + "`" if acc['front_switches'] else "-"
-        led_str = "`" + "`,`".join(map(str, acc['leds'])) + "`" if acc['leds'] else "-"
-        servo_str = "`" + "`,`".join(map(str, acc['servos'])) + "`" if acc['servos'] else "-"
-        global_id_str = f"`{global_id}`"
-        global_code_str = f"`{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0]}{shared.ACCESSORY_SHORTNAMES[acc_type]}:{local_id}`"
-        local_id_str = f"`{local_id}`"
-        module_str = f"`{module}` ({shared.LEVEL_NAMES_MAP[level]} level, baseboard {shared.BASEBOARD_NAMES_MAP[bb]})"
-
-        raw_rows.append({
-            '_global_id': global_id,
-            'Global ID': global_id_str,
-            'Global Code': global_code_str,
-            'Module': module_str,
-            'Accessory Type': shared.ACCESSORY_NAMES[acc_type],
-            'Accessory ID': local_id_str,
-            'Rear Switches': rear_sw,
-            'Front Switches': front_sw,
-            'LEDs': led_str,
-            'Servos': servo_str,
-        })
-        
-    # 2. Sort by global ID string, stripped of leading and trailing back ticks
-    raw_rows.sort(key=lambda x: (int(x['_global_id'])))
-    
-    # 3. Reassemble structured row arrays back into parallel column arrays
-    column_data = {
-        'Global ID': [],
-        'Global Code': [],
-        'Module': [],
-        'Accessory Type': [],
-        'Accessory ID': [],
-        'Rear Switches': [],
-        'Front Switches': [],
-        'LEDs': [],
-        'Servos': [],
-    }
-    
-    for row in raw_rows:
-        for key in column_data.keys():
-            column_data[key].append(row[key])
-            
-    return column_data
-
-def save_accessory_info_documentation(accessory_info: list) -> None:
-
-    doc_info = generate_accessory_table(accessory_info)
-
-    bb_names = list(shared.BASEBOARD_NAMES_MAP.values())
-
-    markdown = "# Accessory Details\n\n"
-    markdown += "The following table describes all the layout's accessories.\n\n"
-    markdown += "* _Global ID_ identifies the accessory uniquely within the whole layout.\n"
-    markdown += "* _Global Code_ human readable version of _Global ID_. It can be decoded as follows:\n"
-    markdown += f"    * 1st character: baseboard ID (`{bb_names[0]}`..`{bb_names[-1]}`)\n"
-    markdown += f"    * 2nd character: level ({'; '.join([f"`{i[0].upper()}` - {i.capitalize()}" for i in shared.LEVEL_VALUE_MAP.keys() ])})\n"
-    markdown += f"    * 3rd character: accessory type ({'; '.join([f"`{shared.ACCESSORY_SHORTNAMES[a].upper()}` - {shared.ACCESSORY_NAMES[a].capitalize()}" for a in AccType])})\n"
-    markdown += "    * Separator (`:`)\n"
-    markdown += f"    * digit(s): the id (`0`..`{shared.MAX_ACCESSORIES_PER_MODULE - 1}`) of the accessory within its baseboard, level and type\n"
-    markdown += "* _Module_ identifies the module that contains the accessory.\n"
-    markdown += "* _Accessory Type_ specifies the type of the accessory.\n"
-    markdown += "* _Accessory ID_ is the local identifier of the accessory, unique only within its baseboard and type.\n"
-    markdown += "* _Rear Switches_ is a list of the IDs of the switches that operates the accessory from the rear of the baseboard.\n"
-    markdown += "* _Front Switches_ is a list of the IDs of the switches that operates the accessory from the front of the baseboard, if any.\n"
-    markdown += "* _LEDs_ is a list of LEDs that are controlled by the accessory, if any.\n"
-    markdown += "* _Servos_ is a list of Servos that are controlled by the accessory, if any.\n\n"
-    markdown += to_markdown_table(doc_info, max_widths=uniform_table_padding(doc_info, 99))
-    markdown += "\n\nNote that switch, LED and servo IDs are unique within their host module, but not unique across the layout.\n"
-
-    with open(os.path.join(common.ROOT_DIR, common.ACCESSORY_DOCS_FILE), "w", encoding="utf-8") as fd:
-        fd.write(markdown)
-    print(f"💾 Accessory documentation saved in '{common.ACCESSORY_DOCS_FILE}'")
 
 def generate_led_table(accessory_info: list) -> dict:
     """
@@ -677,12 +549,9 @@ def create_servo_calibration_table(accessory_info: list[dict]) -> dict[str, list
     )
     
     column_data = {
-        # 'Baseboard / Level': [],
         "Servo": [], 
         "Off Position": [], 
         "On Position": [],
-        # "Accessory Type": [], 
-        # "Accessory ID": [],
         "Accessory": []
     }
     
@@ -712,6 +581,7 @@ if __name__ == "__main__":
     
     os.makedirs(os.path.join(common.ROOT_DIR, common.DOCS_DIR), exist_ok=True)
     os.makedirs(os.path.join(common.ROOT_DIR, common.BIN_DIR), exist_ok=True)
+    os.makedirs(os.path.join(common.ROOT_DIR, common.TEMP_DIR), exist_ok=True)
     os.makedirs(os.path.join(common.ROOT_DIR, common.TEMPLATES_DIR), exist_ok=True)
 
     # Create accessory information from accessory description file
@@ -741,31 +611,18 @@ if __name__ == "__main__":
             print(f"  - {err}")
         sys.exit(1)
 
-    # Write binary accessory info file
+    # Write accessory info to JSON file, for later processing with config files
+    save_accessory_info_json(accessory_info)
     
-    save_accessory_info_to_binary(accessory_info)
-
-    # Write documentation files as Markdown
- 
-    # -- write accessory documentation
-    save_accessory_info_documentation(accessory_info)
-
-    # -- write LED documentation
+    # Write LED documentation
     save_led_info_documentation(accessory_info)
 
     # Write configuration template files as Markdown tables
-
-    # -- write accessory config template
     save_accessory_config_template_file(accessory_info)
-
-    # -- write switch config template
     save_switch_config_template_file(accessory_info)
-
-    # -- write servo config template
     save_servo_config_template_file(accessory_info)
 
     # Write instructions for next steps
-
     print("\n✅ NEXT STEPS:")
     print("   When all configuration tables have been edited and saved")
     print(f"   run the '{common.BUILD_CONFIG_SCRIPT}' Python program to generate")
