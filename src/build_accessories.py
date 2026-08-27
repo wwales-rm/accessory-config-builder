@@ -34,11 +34,11 @@ SERVOS_PER_ACCTYPE = {
     AccType.TURNOUT_X: 2
 }
 
-TURNOUT_SERVO_DEFAULT_POS = {'On': 900, 'Off': 400}
-UNCOUPLER_SERVO_DEFAULT_POS = {'On': 1200, 'Off': 100}
+TURNOUT_SERVO_DEFAULT_POS = {'Right': 900, 'Left': 400}
+UNCOUPLER_SERVO_DEFAULT_POS = {'Right': 1200, 'Left': 100}
 
 SERVO_DEFAULT_POS_PER_ACCTYPE = {
-    AccType.FEATURE: {'On': 0, 'Off': 0},   # Features don't use servos
+    AccType.FEATURE: {'Right': 0, 'Left': 0},   # Features don't use servos
     AccType.UNCOUPLER: UNCOUPLER_SERVO_DEFAULT_POS,
     AccType.TURNOUT_S: TURNOUT_SERVO_DEFAULT_POS,
     AccType.TURNOUT_3: TURNOUT_SERVO_DEFAULT_POS,
@@ -512,7 +512,7 @@ def save_switch_config_template_file(accessory_info: list) -> None:
 def create_servo_calibration_table(accessory_info: list[dict]) -> dict[str, list]:
     """
     Creates a dictionary representing a table of all servos with type-specific
-    default on and off positions.
+    default left and right positions.
     """
 
     raw_rows = []
@@ -531,13 +531,11 @@ def create_servo_calibration_table(accessory_info: list[dict]) -> dict[str, list
                 '_level': level,
                 '_bb': bb,
                 '_servo': s_id,
-                # 'Baseboard / Level': bl,
                 'Servo': f"{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0]}:{s_id}",
-                'Off Position': SERVO_DEFAULT_POS_PER_ACCTYPE[acc_type]['Off'],
-                'On Position': SERVO_DEFAULT_POS_PER_ACCTYPE[acc_type]['On'],
+                'Left Position': SERVO_DEFAULT_POS_PER_ACCTYPE[acc_type]['Left'],
+                'Right Position': SERVO_DEFAULT_POS_PER_ACCTYPE[acc_type]['Right'],
+                'Reversed': 'No',
                 'Accessory': f"{shared.ACCESSORY_SHORTNAMES[acc_type]}:{l_id}",
-                # 'Accessory Type': shared.ACCESSORY_NAMES[acc_type],
-                # 'Accessory ID': l_id
             })
             
     raw_rows.sort(
@@ -550,8 +548,9 @@ def create_servo_calibration_table(accessory_info: list[dict]) -> dict[str, list
     
     column_data = {
         "Servo": [], 
-        "Off Position": [], 
-        "On Position": [],
+        "Left Position": [], 
+        "Right Position": [],
+        'Reversed': [],
         "Accessory": []
     }
     

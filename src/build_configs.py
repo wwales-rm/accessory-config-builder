@@ -77,22 +77,27 @@ def create_switches_config():
 
 def export_servos_config_to_binary(servo_data: dict) -> None:
     """
-    Packs calibrated servo positions into a 6-byte binary structure.
+    Packs calibrated servo positions into a 7-byte binary structure.
     Header: 1-byte count of total layout servos.
     Records: 
       - Byte 0: Module ID (3 bit number) 
       - Byte 1: Local servo ID within module (4 bit number)
-      - Bytes 2 & 3: Off Position (2 bytes)
-      - Bytes 4 & 5: On Position (2 bytes)
+      - Bytes 2 & 3: Left Position (2 bytes)
+      - Bytes 4 & 5: Right Position (2 bytes)
+      - Byte 6: Reversed (single bit: 0x01 - reversed, 0x00 - normal)
     """
 
     # Servo config file contains some redundant table columns. Required columns are:
     # * 'Servo' - need to parse module and local servo ID from here to create global servo ID written to file
-    # * 'Off Position' - position of servo when off
-    # * 'On Position' - position of servo when on
+    # * 'Left Position' - left-most position of servo
+    # * 'Right Position' - right-most position of servo
+    # * 'Reversed' - whether servo is reversed:
+    #     * if 'no' servo off is left position, on is right position;
+    #     * if 'yes' servo off is right position, on is left position
     servo_ids = servo_data["Servo"]
-    off_positions = servo_data["Off Position"]
-    on_positions = servo_data["On Position"]
+    left_positions = servo_data["Left Position"]
+    right_positions = servo_data["Right Position"]
+    reversed_flags = servo_data['Reversed']    
 
     LEVEL_INITIALS_MAP = {k[0].upper(): v for k, v in shared.LEVEL_VALUE_MAP.items()}
 
@@ -108,8 +113,9 @@ def export_servos_config_to_binary(servo_data: dict) -> None:
         # Write individual records sequentially
         for idx in range(num_servos):
             global_servo_id = servo_ids[idx]
-            off_pos = off_positions[idx]
-            on_pos = on_positions[idx]
+            left_pos = int(left_positions[idx])
+            right_pos = int(right_positions[idx])
+            reversed_flag = 0 if reversed_flags[idx].lower() == 'no' else 1
 
             # extract module and local servo ID from global servo ID. This has form 'XY:ddd', where:
             # * 'X' is the Baseboard ID - 'A'..'D', where 'A' is baseboard 0 through to 'D' for baseboard 3.
@@ -123,14 +129,15 @@ def export_servos_config_to_binary(servo_data: dict) -> None:
             bb = shared.BASEBOARD_VALUE_MAP[bb_code]
             level = LEVEL_INITIALS_MAP[level_code]
             module_id = shared.encode_module_id(level, bb)
-            
-            # Format data into a 6 byte record and write to file
+
+            # Format data into a 7 byte record and write to file
             record_bytes = struct.pack(
-                "<BBHH",        # 6 bytes
+                "<BBHHB",       # 7 bytes
                 module_id,      # uint8: module containing servo
                 servo_id,       # uint8: local servo ID
-                off_pos,        # little endian uint16: calibrated servo off position
-                on_pos          # little endian uint16: calibrated servo off position
+                left_pos,        # little endian uint16: calibrated servo left position
+                right_pos,       # little endian uint16: calibrated servo right position
+                reversed_flag   # uint8: whether servo operates in reverse
             )
             bin_file.write(record_bytes)
             file_size += len(record_bytes)
@@ -382,8 +389,9 @@ def reconstruct_servo_config_from_binary() -> dict:
     column_data = {
         "module_id": [],
         "local_servo_id": [], 
-        "off_pos": [], 
-        "on_pos": [], 
+        "left_pos": [], 
+        "right_pos": [], 
+        "reversed": [],
     }
 
     with open(os.path.join(common.ROOT_DIR, common.SERVO_CONFIG_FILE), "rb") as bin_file:
@@ -393,7 +401,7 @@ def reconstruct_servo_config_from_binary() -> dict:
             return column_data
         num_servos = struct.unpack("<B", header)[0]
 
-        RECORD_SIZE = 6
+        RECORD_SIZE = 7
 
         for _ in range(num_servos):
             
@@ -401,12 +409,13 @@ def reconstruct_servo_config_from_binary() -> dict:
             if len(record_bytes) < RECORD_SIZE:
                 raise FileFormatError(f"Malformed binary: Incomplete {RECORD_SIZE}-byte record found in {common.SERVO_CONFIG_FILE}.")
 
-            module_id, local_servo_id, off_pos, on_pos = struct.unpack("<BBHH", record_bytes)
+            module_id, local_servo_id, left_pos, right_pos, reversed = struct.unpack("<BBHHB", record_bytes)
 
             column_data["module_id"].append(module_id)
             column_data["local_servo_id"].append(local_servo_id)
-            column_data["off_pos"].append(off_pos)
-            column_data["on_pos"].append(on_pos)
+            column_data["left_pos"].append(left_pos)
+            column_data["right_pos"].append(right_pos)
+            column_data["reversed"].append(reversed)
 
     return column_data
 
@@ -483,7 +492,16 @@ def validate_binary_files() -> tuple:
     for module in range(shared.NUM_MODULES):
         missing_servos = layout_servos_per_module[module] - servo_config_servos_per_module[module]
         if missing_servos:
-            errors.append(f"Constraint Violation: Servos {missing_servos} defined for module {module}  in {common.ACCESSORY_INFO_FILE} are missing inside {common.SERVO_CONFIG_FILE}.")
+            errors.append(f"Constraint Violation: Servos {missing_servos} defined for module {module} in {common.ACCESSORY_INFO_FILE} are missing inside {common.SERVO_CONFIG_FILE}.")
+
+    # Check if every servo has left position < right position
+    for idx in range(servo_data_len):
+        left_pos = int(servo_data['left_pos'][idx])
+        right_pos = int(servo_data['right_pos'][idx])
+        module_id = servo_data['module_id'][idx]
+        local_servo_id = servo_data['local_servo_id'][idx]
+        if left_pos >= right_pos:
+            errors.append(f"Constraint Violation: Servo {local_servo_id} in module {module_id} has left position ({left_pos} >= right position ({right_pos}) in {common.SERVO_CONFIG_FILE})")
 
     # Check if every local servo has an id in [1..15]
     
@@ -697,8 +715,9 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     servo_headings = [
         'Module',
         'Servo',
-        'Off Position',
-        'On Position',
+        'Left Position',
+        'Right Position',
+        'Reversed',
         'Accessory',
     ]
 
@@ -717,8 +736,9 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     for idx in range(len(servo_data['local_servo_id'])):
         local_servo_id = servo_data['local_servo_id'][idx]
         module_id = servo_data['module_id'][idx]
-        off_pos = servo_data['off_pos'][idx]
-        on_pos = servo_data['on_pos'][idx]
+        left_pos = servo_data['left_pos'][idx]
+        right_pos = servo_data['right_pos'][idx]
+        reversed = servo_data['reversed'][idx]
         
         # Get accessory assoicated with servo
         acc = servo_to_accessory.get((module_id, local_servo_id), None)
@@ -733,8 +753,9 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
         # Add columns
         columns['Module'].append(f"`{module_id}`")
         columns['Servo'].append(f"`{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0].upper()}:{local_servo_id}`")
-        columns['Off Position'].append(f"`{off_pos}`")
-        columns['On Position'].append(f"`{on_pos}`")
+        columns['Left Position'].append(f"`{left_pos}`")
+        columns['Right Position'].append(f"`{right_pos}`")
+        columns['Reversed'].append('Yes' if reversed else 'No')
         columns['Accessory'].append(f"`{shared.BASEBOARD_NAMES_MAP[bb]}{shared.LEVEL_NAMES_MAP[level][0].upper()}{shared.ACCESSORY_SHORTNAMES[acc_type]}:{acc_lid}`")
  
     # Generate markdown
@@ -743,8 +764,9 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     markdown += "The following table provides information about each servo on the layout.\n\n"
     markdown += "* _Module_ is the number of the layout module containing both the servo and its controlling accessory.\n"
     markdown += "* _Servo_ is the ID of the servo. This is unique within the level and baseboard.\n"
-    markdown += "* _Off Position_ is the calibrated `off` or default position of the servo.\n"
-    markdown += "* _On Position_ is the calibrated `on` or non-default position of the servo.\n"
+    markdown += "* _Left Position_ is the calibrated `left` position of the servo.\n"
+    markdown += "* _Right Position_ is the calibrated `right` position of the servo.\n"
+    markdown += "* _Reversed_ is a flag denotes whether the `normal` position of the servo is _Left Position_ or _Right Position_ or vice versa. When _Reversed_ is false then the `normal` position is _Left Position_ and when _Reversed_ is true then the `normal` position is _Right Position_.\n"
     markdown += "* _Accessory_ is ID of the accessory that controls the servo within. This is unique within the layout.\n\n"
     markdown += generate_markdown_table(columns)
     markdown += "\n\nKey to servo and accessory IDs:\n\n"
@@ -758,7 +780,10 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     markdown += f"    * 2nd character: level ({'; '.join([f"`{i[0].upper()}` - {i.capitalize()}" for i in shared.LEVEL_VALUE_MAP.keys() ])})\n"
     markdown += f"    * 3rd character: accessory type ({'; '.join([f"`{shared.ACCESSORY_SHORTNAMES[a].upper()}` - {shared.ACCESSORY_NAMES[a].capitalize()}" for a in AccType])})\n"
     markdown += "    * 4th character: separator (always `:`)\n"
-    markdown += f"    * digit(s): the id (`0`..`{shared.MAX_ACCESSORIES_PER_MODULE - 1}`) of the accessory within its baseboard, level and type\n"
+    markdown += f"    * digit(s): the id (`0`..`{shared.MAX_ACCESSORIES_PER_MODULE - 1}`) of the accessory within its baseboard, level and type\n\n"
+    markdown += "* _Reversed_ has the following function:\n\n"
+    markdown += "    * When false ('No') the servo's `normal` position is _Left Position_ and its `turned` position is _Right Position_.\n"
+    markdown += "    * When true ('Yes') the servo's `normal` position is _Right Position_ and its `turned` position is _Left Position_.\n"
 
     # Save required data
     save_markdown(markdown, common.SERVO_DOCS_FILE)
