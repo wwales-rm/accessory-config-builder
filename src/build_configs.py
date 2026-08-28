@@ -494,7 +494,7 @@ def validate_binary_files() -> tuple:
         if missing_servos:
             errors.append(f"Constraint Violation: Servos {missing_servos} defined for module {module} in {common.ACCESSORY_INFO_FILE} are missing inside {common.SERVO_CONFIG_FILE}.")
 
-    # Check if every servo has left position < right position
+    # Check if every servo has left position < right position and positions in range
     for idx in range(servo_data_len):
         left_pos = int(servo_data['left_pos'][idx])
         right_pos = int(servo_data['right_pos'][idx])
@@ -502,9 +502,12 @@ def validate_binary_files() -> tuple:
         local_servo_id = servo_data['local_servo_id'][idx]
         if left_pos >= right_pos:
             errors.append(f"Constraint Violation: Servo {local_servo_id} in module {module_id} has left position ({left_pos} >= right position ({right_pos}) in {common.SERVO_CONFIG_FILE})")
+        if not left_pos in shared.SERVO_RANGES['left']:
+            errors.append(f"Constraint Violation: Servo {local_servo_id} in module {module_id} has left position {left_pos} out of range")
+        if not right_pos in shared.SERVO_RANGES['right']:
+            errors.append(f"Constraint Violation: Servo {local_servo_id} in module {module_id} has right position {right_pos} out of range")
 
     # Check if every local servo has an id in [1..15]
-    
     for local_servo_id in servo_data['local_servo_id']:
         if not shared.MIN_SERVO_ID <= local_servo_id <= shared.MAX_SERVO_ID:
             errors.append(f"Constraint Violation: Servo ID {s_id} is out of permittted range ({shared.MIN_SERVO_ID}..{shared.MAX_SERVO_ID}).")

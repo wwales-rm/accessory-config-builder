@@ -53,6 +53,11 @@ ACCESSORY_MODE_COUNTS = {
     AccType.TURNOUT_X: 2    # mode 0 -> normal, mode 1 -> reversed
 }
 
+SERVO_RANGES = {
+    'left': range(0, 1022 + 1),
+    'right': range(1, 1023 + 1)    
+}
+
 def encode_global_acc_id(module: int, acc_type: AccType, local_id: int) -> int:
     # global ID is 16 bit unsigned integer encoded as follows:
     # bits 0..7: local accessory ID

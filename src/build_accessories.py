@@ -35,7 +35,7 @@ SERVOS_PER_ACCTYPE = {
 }
 
 TURNOUT_SERVO_DEFAULT_POS = {'Right': 900, 'Left': 400}
-UNCOUPLER_SERVO_DEFAULT_POS = {'Right': 1200, 'Left': 100}
+UNCOUPLER_SERVO_DEFAULT_POS = {'Right': 1023, 'Left': 100}
 
 SERVO_DEFAULT_POS_PER_ACCTYPE = {
     AccType.FEATURE: {'Right': 0, 'Left': 0},   # Features don't use servos
