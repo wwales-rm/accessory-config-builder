@@ -827,10 +827,14 @@ def generate_summary_docs_table(accessory_data: dict[str, list]) -> str:
 
     total_switches_per_module = summarize_module_elements(accessory_data, ['rear_switches', 'front_switches'])
     total_switches = sum(list(total_switches_per_module.values()))
+    total_74hc165_chips_per_module = {k: (total_switches_per_module[k] // 8 + (1 if total_switches_per_module[k] % 8 != 0 else 0)) for k in total_switches_per_module.keys()}
+    total_74hc165_chips = sum(list(total_74hc165_chips_per_module.values()))
 
     total_leds_per_module = summarize_module_elements(accessory_data, ['leds'])
     total_leds = sum(list(total_leds_per_module.values()))
-
+    total_tpic6_chips_per_module = {k: (total_leds_per_module[k] // 8 + (1 if total_leds_per_module[k] % 8 != 0 else 0)) for k in total_leds_per_module.keys()}
+    total_tpic6_chips = sum(list(total_tpic6_chips_per_module.values()))
+    
     total_servos_per_module = summarize_module_elements(accessory_data, ['servos'])
     total_servos = sum(list(total_servos_per_module.values()))
 
@@ -843,8 +847,10 @@ def generate_summary_docs_table(accessory_data: dict[str, list]) -> str:
         'Module': list(range(shared.NUM_MODULES)) + ['Layout Total'],
         'Accessories': list(total_accs_per_module.values()) + [total_accs],
         'Switches': list(total_switches_per_module.values()) + [total_switches],
+        '74HC165 chips': list(total_74hc165_chips_per_module.values()) + [total_74hc165_chips],
         'LEDs': list(total_leds_per_module.values()) + [total_leds],
-        'Servos': list(total_servos_per_module.values()) + [total_servos]
+        'TPIC6 chips': list(total_tpic6_chips_per_module.values()) + [total_tpic6_chips],
+        'Servos': list(total_servos_per_module.values()) + [total_servos],
     } 
 
     return generate_markdown_table(data)
