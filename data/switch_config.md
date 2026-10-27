@@ -42,6 +42,7 @@
 | 6      | C - High          | U:1       | Rear            | CHR:1     | 1111         |
 | 6      | C - High          | U:2       | Rear            | CHR:2     | 1111         |
 | 6      | C - High          | X:0       | Rear            | CHR:3     | 1111         |
+| 6      | C - High          | S:0       | Rear            | CHR:4     | 1111         |
 | 3      | D - Low           | U:0       | Rear            | DLR:0     | 1111         |
 | 3      | D - Low           | U:1       | Rear            | DLR:1     | 1111         |
 | 3      | D - Low           | T:0       | Rear            | DLR:2     | 1111         |
