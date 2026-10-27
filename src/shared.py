@@ -28,13 +28,15 @@ class AccType(Enum):
     TURNOUT_S = 2
     TURNOUT_3 = 3
     TURNOUT_X = 4
+    SIGNAL = 5
 
 ACCESSORY_NAMES = {
     AccType.FEATURE:   'Feature',
     AccType.UNCOUPLER: 'Uncoupler',
     AccType.TURNOUT_S: 'Simple Turnout',
     AccType.TURNOUT_3: '3-way Turnout',
-    AccType.TURNOUT_X: 'Crossover'
+    AccType.TURNOUT_X: 'Crossover',
+    AccType.SIGNAL: 'Signal'
 }
 
 ACCESSORY_SHORTNAMES = {
@@ -42,7 +44,8 @@ ACCESSORY_SHORTNAMES = {
     AccType.UNCOUPLER: 'U',
     AccType.TURNOUT_S: 'T',
     AccType.TURNOUT_3: '3',
-    AccType.TURNOUT_X: 'X'
+    AccType.TURNOUT_X: 'X',
+    AccType.SIGNAL:    'S'
 }
 
 ACCESSORY_MODE_COUNTS = {
@@ -50,7 +53,8 @@ ACCESSORY_MODE_COUNTS = {
     AccType.UNCOUPLER: 2,   # mode 0 -> retracted, mode 1 -> extended
     AccType.TURNOUT_S: 2,   # mode 0 -> normal, mode 1 -> reversed
     AccType.TURNOUT_3: 3,   # mode 0 -> left, mode 1 -> straight, mode 2 -> right
-    AccType.TURNOUT_X: 2    # mode 0 -> normal, mode 1 -> reversed
+    AccType.TURNOUT_X: 2,   # mode 0 -> normal, mode 1 -> reversed
+    AccType.SIGNAL:    2    # mode 0 -> on, mode 1 -> off
 }
 
 SERVO_RANGES = {

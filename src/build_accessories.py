@@ -15,7 +15,8 @@ SWITCHES_PER_ACC_TYPE = {
     AccType.UNCOUPLER: 1,
     AccType.TURNOUT_S: 1,
     AccType.TURNOUT_3: 3,
-    AccType.TURNOUT_X: 1
+    AccType.TURNOUT_X: 1,
+    AccType.SIGNAL: 1
 }
 
 LEDS_PER_ACCTYPE = {
@@ -23,7 +24,8 @@ LEDS_PER_ACCTYPE = {
     AccType.UNCOUPLER: 1,
     AccType.TURNOUT_S: 2,
     AccType.TURNOUT_3: 3,
-    AccType.TURNOUT_X: 4
+    AccType.TURNOUT_X: 4,
+    AccType.SIGNAL: 2
 }
     
 SERVOS_PER_ACCTYPE = {
@@ -31,18 +33,21 @@ SERVOS_PER_ACCTYPE = {
     AccType.UNCOUPLER: 1,
     AccType.TURNOUT_S: 1,
     AccType.TURNOUT_3: 2,
-    AccType.TURNOUT_X: 2
+    AccType.TURNOUT_X: 2,
+    AccType.SIGNAL: 1
 }
 
 TURNOUT_SERVO_DEFAULT_POS = {'Right': 900, 'Left': 400}
 UNCOUPLER_SERVO_DEFAULT_POS = {'Right': 1023, 'Left': 100}
+SIGNAL_SERVO_DEFAULT_POS = {'Right': 800, 'Left': 200}
 
 SERVO_DEFAULT_POS_PER_ACCTYPE = {
     AccType.FEATURE: {'Right': 0, 'Left': 0},   # Features don't use servos
     AccType.UNCOUPLER: UNCOUPLER_SERVO_DEFAULT_POS,
     AccType.TURNOUT_S: TURNOUT_SERVO_DEFAULT_POS,
     AccType.TURNOUT_3: TURNOUT_SERVO_DEFAULT_POS,
-    AccType.TURNOUT_X: TURNOUT_SERVO_DEFAULT_POS
+    AccType.TURNOUT_X: TURNOUT_SERVO_DEFAULT_POS,
+    AccType.SIGNAL: SIGNAL_SERVO_DEFAULT_POS
 }
 
 ACCESSORY_MODE_DEFAULTS = {
@@ -50,7 +55,8 @@ ACCESSORY_MODE_DEFAULTS = {
     AccType.UNCOUPLER: 0,   # retracted
     AccType.TURNOUT_S: 0,   # normal
     AccType.TURNOUT_3: 1,   # straight
-    AccType.TURNOUT_X: 0    # normal
+    AccType.TURNOUT_X: 0,   # normal
+    AccType.SIGNAL:    0    # on (stop)
 }
 
 MAX_SWITCHES_PER_MODULE = 24
@@ -65,7 +71,8 @@ def generate_module_info(table_data: dict) -> list:
     ACC_TABLE_HEADINGS_TO_ACC_TYPES = {
         'Single Turnouts': AccType.TURNOUT_S,
         '3 Way Turnouts': AccType.TURNOUT_3, 
-        'Crossovers': AccType.TURNOUT_X, 
+        'Crossovers': AccType.TURNOUT_X,
+        'Signals' : AccType.SIGNAL,
         'Uncouplers': AccType.UNCOUPLER,
         'Features': AccType.FEATURE
     }
@@ -185,7 +192,8 @@ def generate_accessory_info(module_data: list[dict]) -> dict[str, any]:
             AccType.UNCOUPLER: 0,
             AccType.TURNOUT_S: 0, 
             AccType.TURNOUT_3: 0, 
-            AccType.TURNOUT_X: 0, 
+            AccType.TURNOUT_X: 0,
+            AccType.SIGNAL: 0 
         }
 
         for acc in AccType:
