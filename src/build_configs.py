@@ -792,80 +792,6 @@ def save_servo_config_docs(servo_data: list, accessories_data: list) -> None:
     save_markdown(markdown, common.SERVO_DOCS_FILE)
     print(f"💾 Saved servo configuration documentation to '{common.SERVO_DOCS_FILE}'")
 
-def generate_summary_docs_table(accessory_data: dict[str, list]) -> str:
-
-    def summarize_module_elements(data: list, target_keys: list) -> tuple[dict, list[dict]]:
-        """
-        Sums the lengths of lists stored under specified keys, grouped by module (0-7).
-        
-        Args:
-            data: List of dictionaries containing a 'module' key and target lists.
-            target_keys: List of string keys whose list lengths should be summed.
-            
-        Returns:
-            A tuple containing:
-            1. A single dictionary mapping module numbers to total counts.
-            2. A list of single-key dictionaries mapping module numbers to total counts.
-        """
-        # Pre-populate all modules from 0 to 7 with 0
-        combined_dict = {module: 0 for module in range(8)}
-        
-        for item in data:
-            module = item.get("module")
-            
-            # Skip if the module key is missing or out of range (0 to 7)
-            if module is None or not (0 <= module <= 7):
-                continue
-                
-            # Sum lengths of all requested lists for this module
-            for key in target_keys:
-                element_list = item.get(key)
-                if isinstance(element_list, list):
-                    combined_dict[module] += len(element_list)
-
-        return combined_dict
-
-    total_switches_per_module = summarize_module_elements(accessory_data, ['rear_switches', 'front_switches'])
-    total_switches = sum(list(total_switches_per_module.values()))
-    total_74hc165_chips_per_module = {k: (total_switches_per_module[k] // 8 + (1 if total_switches_per_module[k] % 8 != 0 else 0)) for k in total_switches_per_module.keys()}
-    total_74hc165_chips = sum(list(total_74hc165_chips_per_module.values()))
-
-    total_leds_per_module = summarize_module_elements(accessory_data, ['leds'])
-    total_leds = sum(list(total_leds_per_module.values()))
-    total_tpic6_chips_per_module = {k: (total_leds_per_module[k] // 8 + (1 if total_leds_per_module[k] % 8 != 0 else 0)) for k in total_leds_per_module.keys()}
-    total_tpic6_chips = sum(list(total_tpic6_chips_per_module.values()))
-    
-    total_servos_per_module = summarize_module_elements(accessory_data, ['servos'])
-    total_servos = sum(list(total_servos_per_module.values()))
-
-    total_accs_per_module = {module: 0 for module in range(8)}
-    for acc_item in accessory_data:
-        total_accs_per_module[acc_item['module']] += 1
-    total_accs = sum(list(total_accs_per_module.values()))
-
-    data = {
-        'Module': list(range(shared.NUM_MODULES)) + ['Layout Total'],
-        'Accessories': list(total_accs_per_module.values()) + [total_accs],
-        'Switches': list(total_switches_per_module.values()) + [total_switches],
-        '74HC165 chips': list(total_74hc165_chips_per_module.values()) + [total_74hc165_chips],
-        'LEDs': list(total_leds_per_module.values()) + [total_leds],
-        'TPIC6 chips': list(total_tpic6_chips_per_module.values()) + [total_tpic6_chips],
-        'Servos': list(total_servos_per_module.values()) + [total_servos],
-    } 
-
-    return generate_markdown_table(data)
-
-def save_summary_docs(accessory_data: dict[str, list]) -> None:
-
-    table = generate_summary_docs_table(accessory_data)
-
-    markdown =  "# Hardware Summary\n\n"
-    markdown += "The following table displays the total numbers of different types of hardware per module, and for the whole layout.\n\n"
-    markdown += table
-    save_markdown(markdown, common.SUMMARY_DOCS_FILE)
-
-    print(f"💾 Saved summary documentation to '{common.SUMMARY_DOCS_FILE}'")
-
 if __name__ == "__main__":
 
     if not os.path.exists(os.path.join(common.ROOT_DIR, common.ACCESSORY_INFO_TEMP_FILE)):
@@ -896,10 +822,6 @@ if __name__ == "__main__":
         save_accessory_docs(recovered_accessories)
         save_switch_config_docs(recovered_switch_config, recovered_accessories)
         save_servo_config_docs(recovered_servo_config, recovered_accessories)
-        save_summary_docs(recovered_accessories)
-
-        # Display hardware summary
-        print(f"\nSummary of layout hardware:\n\n{generate_summary_docs_table(recovered_accessories)}\n")
 
         # Display instructions
         print(f"\n✅ NEXT STEPS:")

@@ -1,8 +1,8 @@
 from collections import defaultdict
 import os
 import sys
-from enum import Enum
-import struct
+# from enum import Enum
+# import struct
 import json
 
 import common
@@ -381,6 +381,117 @@ def save_led_info_documentation(accessory_info: list) -> None:
         fd.write(markdown)
     print(f"💾 LED documentation saved in '{common.LED_DOCS_FILE}'")
 
+def summarize_module_elements(data: list, target_keys: list) -> tuple[dict, list[dict]]:
+    """
+    Sums the lengths of lists stored under specified keys, grouped by module (0-7).
+    
+    Args:
+        data: List of dictionaries containing a 'module' key and target lists.
+        target_keys: List of string keys whose list lengths should be summed.
+        
+    Returns:
+        A tuple containing:
+        1. A single dictionary mapping module numbers to total counts.
+        2. A list of single-key dictionaries mapping module numbers to total counts.
+    """
+    # Pre-populate all modules from 0 to 7 with 0
+    combined_dict = {module: 0 for module in range(8)}
+    
+    for item in data:
+        module = item.get("module")
+        
+        # Skip if the module key is missing or out of range (0 to 7)
+        if module is None or not (0 <= module <= 7):
+            continue
+            
+        # Sum lengths of all requested lists for this module
+        for key in target_keys:
+            element_list = item.get(key)
+            if isinstance(element_list, list):
+                combined_dict[module] += len(element_list)
+
+    return combined_dict
+
+def generate_summary_table(accessory_info: list) -> dict:
+    """
+    Produces summary of accessory components in human-readable columnar dictionary.
+    """
+
+    # Dictionary containing required totals
+
+    totals = {
+        k: {
+            'accessories': 0,
+            'switch_inputs': 0,
+            'led_inputs': 0,
+            'servos': 0,
+        } 
+        for k in range(shared.NUM_MODULES) 
+    }
+
+    # 1. Unpack, format, and organize rows for explicit multi-key sorting
+    
+    raw_data = []
+    
+    for acc in accessory_info:
+        g_id = acc['global_id']
+        module, acc_type, l_id = shared.decode_global_acc_id(g_id)
+        level, bb = shared.decode_module_id(module)
+
+        t = totals[module]
+        t['accessories'] += 1
+        t['switch_inputs'] += len(acc['rear_switches']) + len(acc['front_switches'])
+        t['led_inputs'] += len(acc['leds'])
+        t['servos'] += len(acc['servos'])
+
+        totals[module] = t
+
+    column_data = {
+        'Module': [],
+        'Accessories': [],
+        'Switches': [],
+        '74HC165 chips': [],
+        'LEDs': [],
+        'TPIC6 chips': [],
+        'Servos': [],
+    }
+
+    modules = list(range(shared.NUM_MODULES))
+    column_data['Module'] = modules + ['Layout Total']
+    
+    accessories = [totals[i]['accessories'] for i in modules]
+    column_data['Accessories'] = accessories + [sum(accessories)]
+    
+    switch_inputs = [totals[i]['switch_inputs'] for i in modules]
+    column_data['Switches'] = switch_inputs + [sum(switch_inputs)]
+    
+    chips_74hc165 = [(switch_inputs[i] // 8 + (1 if switch_inputs[i] % 8 != 0 else 0)) for i in modules]
+    column_data['74HC165 chips'] = chips_74hc165 + [sum(chips_74hc165)]
+    
+    led_inputs = [totals[i]['led_inputs'] for i in modules]
+    column_data['LEDs'] = led_inputs + [sum(led_inputs)]
+    
+    chips_tpic6 = [(led_inputs[i] // 8 + (1 if led_inputs[i] % 8 != 0 else 0)) for i in modules]
+    column_data['TPIC6 chips'] = chips_tpic6 + [sum(chips_tpic6)]
+    
+    servos = [totals[i]['servos'] for i in modules]
+    column_data['Servos'] = servos + [sum(servos)]
+    
+    return column_data
+
+def save_summary_documentation(accessory_info: list) -> None:
+    table_cols = generate_summary_table(accessory_info)
+
+    markdown =  "# Hardware Summary\n\n"
+    markdown += "The following table displays the total numbers of different types of hardware per module, and for the whole layout.\n\n"
+    # markdown += "\n"
+    markdown += to_markdown_table(table_cols, max_widths=uniform_table_padding(table_cols, 99))
+    markdown += "\n"
+
+    with open(os.path.join(common.ROOT_DIR, common.SUMMARY_DOCS_FILE), "w", encoding="utf-8") as fd:
+        fd.write(markdown)
+    print(f"💾 Summary documentation saved in '{common.SUMMARY_DOCS_FILE}'")
+
 def create_accessory_mode_table(accessory_info: list) -> dict:
     """
     Creates a dict[str, list] of all layout accessories with default startup
@@ -623,6 +734,9 @@ if __name__ == "__main__":
     
     # Write LED documentation
     save_led_info_documentation(accessory_info)
+
+    # Write summary documentation
+    save_summary_documentation(accessory_info)
 
     # Write configuration template files as Markdown tables
     save_accessory_config_template_file(accessory_info)
