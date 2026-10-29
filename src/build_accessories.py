@@ -1,8 +1,6 @@
 from collections import defaultdict
 import os
 import sys
-# from enum import Enum
-# import struct
 import json
 
 import common
@@ -17,6 +15,15 @@ SWITCHES_PER_ACC_TYPE = {
     AccType.TURNOUT_3: 3,
     AccType.TURNOUT_X: 1,
     AccType.SIGNAL: 1
+}
+
+PARALLEL_SWITCHES_PER_ACC_TYPE = {
+    AccType.FEATURE: 0,
+    AccType.UNCOUPLER: 0,
+    AccType.TURNOUT_S: 0,
+    AccType.TURNOUT_3: 0,
+    AccType.TURNOUT_X: 1,   # crossovers have two switches in parallel
+    AccType.SIGNAL: 0
 }
 
 LEDS_PER_ACCTYPE = {
@@ -422,7 +429,9 @@ def generate_summary_table(accessory_info: list) -> dict:
     totals = {
         k: {
             'accessories': 0,
+            'physical_switches': 0,
             'switch_inputs': 0,
+            'physical_leds': 0,
             'led_inputs': 0,
             'servos': 0,
         } 
@@ -435,24 +444,37 @@ def generate_summary_table(accessory_info: list) -> dict:
     
     for acc in accessory_info:
         g_id = acc['global_id']
-        module, acc_type, l_id = shared.decode_global_acc_id(g_id)
-        level, bb = shared.decode_module_id(module)
+        module, acc_type, _ = shared.decode_global_acc_id(g_id)
+        level, _ = shared.decode_module_id(module)
+
+        total_switch_inputs = len(acc['rear_switches']) + len(acc['front_switches'])
+        total_physical_switches = total_switch_inputs + PARALLEL_SWITCHES_PER_ACC_TYPE[acc_type]
+        total_led_inputs = len(acc['leds'])
+        total_physical_leds = total_led_inputs
+        if level == shared.LOW_LEVEL_ID:
+            total_physical_leds *= 2
+
+        total_servos = len(acc['servos'])
 
         t = totals[module]
         t['accessories'] += 1
-        t['switch_inputs'] += len(acc['rear_switches']) + len(acc['front_switches'])
-        t['led_inputs'] += len(acc['leds'])
-        t['servos'] += len(acc['servos'])
+        t['physical_switches'] += total_physical_switches
+        t['switch_inputs'] += total_switch_inputs
+        t['physical_leds'] += total_physical_leds
+        t['led_inputs'] += total_led_inputs
+        t['servos'] += total_servos
 
         totals[module] = t
 
     column_data = {
         'Module': [],
         'Accessories': [],
-        'Switches': [],
+        'Switch inputs': [],
         '74HC165 chips': [],
-        'LEDs': [],
+        'Physical switches': [],
+        'LED inputs': [],
         'TPIC6 chips': [],
+        'Physical LEDs': [],
         'Servos': [],
     }
 
@@ -463,16 +485,22 @@ def generate_summary_table(accessory_info: list) -> dict:
     column_data['Accessories'] = accessories + [sum(accessories)]
     
     switch_inputs = [totals[i]['switch_inputs'] for i in modules]
-    column_data['Switches'] = switch_inputs + [sum(switch_inputs)]
+    column_data['Switch inputs'] = switch_inputs + [sum(switch_inputs)]
+
+    physical_switches = [totals[i]['physical_switches'] for i in modules]
+    column_data['Physical switches'] = physical_switches + [sum(physical_switches)]
     
     chips_74hc165 = [(switch_inputs[i] // 8 + (1 if switch_inputs[i] % 8 != 0 else 0)) for i in modules]
     column_data['74HC165 chips'] = chips_74hc165 + [sum(chips_74hc165)]
     
     led_inputs = [totals[i]['led_inputs'] for i in modules]
-    column_data['LEDs'] = led_inputs + [sum(led_inputs)]
+    column_data['LED inputs'] = led_inputs + [sum(led_inputs)]
     
     chips_tpic6 = [(led_inputs[i] // 8 + (1 if led_inputs[i] % 8 != 0 else 0)) for i in modules]
     column_data['TPIC6 chips'] = chips_tpic6 + [sum(chips_tpic6)]
+
+    physical_leds = [totals[i]['physical_leds'] for i in modules]
+    column_data['Physical LEDs'] = physical_leds + [sum(physical_leds)]
     
     servos = [totals[i]['servos'] for i in modules]
     column_data['Servos'] = servos + [sum(servos)]
